@@ -1,14 +1,15 @@
-" Author: Tom Slee
-" Last Modified: Thu Dec 13 14:12:20 2001 
-" Version: 0.2
+" Author: Tom Slee (tslee@ianywhere.com)
+" Last Modified: Tue Jan 15 09:21:36 2002 
+" Version: 0.3
 " 
-" perforce.vim - Interfaces with the perforce command line.  This script 
+" ---------------------------------------------------------------------------
+" perforce.vim - An interface to the perforce command line.  This script 
 " provides a shortcut to the most frequently used operations such as edit,
-" sync, and revert. (that's all for now).
+" sync, and revert (that's all for now).
 "
-" Perforce is a source control system, also known as
-" "the Fast Software Configuration Management System". 
-" See http://www.perforce.com
+" Perforce is a source control system, also known as 'the Fast Software 
+" Configuration Management System'.  See http://www.perforce.com
+" ---------------------------------------------------------------------------
 
 " Standard code to avoid loading twice and to allow not loading
 if exists("loaded_perforce")
@@ -62,11 +63,10 @@ endif
 if executable( "p4.exe" )
     let s:PerforceExecutable="p4" 
 else
-    "echoerr "p4 is not in your path: disabling perforce plug-in"
     augroup! perforce
 endif 
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Minimal execution of a p4 command, followed by re-opening
 " of the file so that status changes are recognised
 " - mainly for use by Perforce command 
@@ -75,23 +75,21 @@ function s:P4ShellCommandAndEditCurrentBuffer( sCmd )
 	e!
 endfunction
 
-"------------------------------------------------------------------------
-function s:P4ShellCommandCurrentBuffer( sCmd )
+"----------------------------------------------------------------------------
 " A wrapper around a p4 command line
+function s:P4ShellCommandCurrentBuffer( sCmd )
     let sReturn = ""
     let filename = expand( "%:p" )
     let sCommandLine = s:PerforceExecutable . " " . a:sCmd . " " . filename 
     let sReturn = system( sCommandLine )
-    "echo sCommandLine
+    " echo "P4ShellCommandCurrentBuffer " . a:sCmd
     return sReturn
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Revert a file, with more checking than just wrapping the command
 function s:P4RevertFile()
     let action=confirm("Revert this file and lose any changes?" ,"&Yes\n&No")
-    " Taking out the prompt as an experiment - set action explicitly
-    " let action = 1
     if action == 1
         let v:errmsg = ""
 	if s:P4Action() != ""
@@ -101,23 +99,19 @@ function s:P4RevertFile()
 	        return
 	    else
 	        e!
+		call s:P4RestoreLastPosition()   
 	    endif
-	"else
-	   "echoerr "File is not opened"
 	endif
       " No, abandon changes
     elseif action == 2
       " Cancel (or any other result), don't do the edit
     endif
-"    "wincmd p
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Sync a file, with more checking than just wrapping the command
 function s:P4SyncFile()
     let action=confirm("Sync this file and lose any changes?" ,"&Yes\n&No")
-    " Taking out the prompt as an experiment - set action explicitly
-    " let action = 1
     if action == 1
         let v:errmsg = ""
 	if s:P4Action() == ""
@@ -138,7 +132,7 @@ function s:P4SyncFile()
 "    "wincmd p
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Open a file for editing, with more checking than just wrapping the command
 " This function prompts before opening -- it is used when a read-only file
 " is altered for the first time
@@ -149,39 +143,31 @@ function s:P4OpenFileForEditWithPrompt()
     endif
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Open a file for editing, with more checking than just wrapping the command
 function s:P4OpenFileForEdit()
     if filewritable( expand( "%:p" ) ) == 0
-        "let action=confirm("File is read only: open it for editing from p4?" ,"&Yes\n&No")
-        " Taking out the prompt as an experiment - set action explicitly
-        let action = 1
-         " Yes - try to edit - if there is an error, cancel
-        if action == 1
-            let v:errmsg = ""
-	    if s:P4IsCurrent() != 0
-	        let sync = confirm( "You do not have the head revision: sync before opening?", "&Yes\n&No" )
-		if sync == 1
-		    call s:P4ShellCommandCurrentBuffer( "sync" )
-		endif
+	let v:errmsg = ""
+	if s:P4IsCurrent() != 0
+	    let sync = confirm( "You do not have the head revision: sync before opening?", "&Yes\n&No" )
+	    if sync == 1
+		call s:P4ShellCommandCurrentBuffer( "sync" )
 	    endif
-	    call s:P4ShellCommandCurrentBuffer( "edit" )
-	    if v:errmsg != ""
-	        echoerr "Unable to open file for editing"
-	        return
-	    else
-	        e!
-	    endif
-          " No, abandon changes
-        elseif action == 2
-	    set nomodified
-        endif
+	endif
+	call s:P4ShellCommandCurrentBuffer( "edit" )
+	if v:errmsg != ""
+	    echoerr "Unable to open file for editing"
+	    return
+	else
+	    e!
+	    call s:P4RestoreLastPosition()   
+	endif
     else
-        echomsg "File is writable: not executing p4 edit"
+	echomsg "File is writable: not executing p4 edit"
     endif
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Produce string for ruler output
 function P4RulerStatus()
     if !exists( "b:headrev" ) 
@@ -200,7 +186,7 @@ function P4RulerStatus()
     endif
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Return file status information
 function s:P4GetFileStatus()
     let filestatus = s:P4ShellCommandCurrentBuffer( "fstat" )
@@ -231,7 +217,7 @@ function s:P4GetFileStatus()
     endif
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " One of a set of functions that returns fields from the p4 fstat command
 function s:P4GetDepotFile()
     let filestatus = s:P4GetFileStatus()
@@ -240,45 +226,34 @@ function s:P4GetDepotFile()
     echo depotfile
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " One of a set of functions that returns fields from the p4 fstat command
 function s:P4GetHeadRev()
     let filestatus = s:P4GetFileStatus()
     let headrev = matchstr( filestatus, "headRev [0-9]*" )
     let headrev = strpart( headrev, 8 )
-    "echo headrev
     return headrev
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " One of a set of functions that returns fields from the p4 fstat command
+" haverev does not change without action from the client, so avoid executing
+" the p4 command if possible.
 function s:P4GetHaveRev()
-    let filestatus = s:P4GetFileStatus()
-    let haverev = matchstr( filestatus, "haveRev [0-9]*" )
-    let haverev = strpart( haverev, 8 )
-    "echo haverev
+    if b:haverev != ""
+	let haverev = b:haverev 
+    else
+	let filestatus = s:P4GetFileStatus()
+        let haverev = matchstr( filestatus, "haveRev [0-9]*" )
+        let haverev = strpart( haverev, 8 )
+    endif
     return haverev
 endfunction
 
-"------------------------------------------------------------------------
-" One of a set of functions that returns fields from the p4 fstat command
-function P4IsOpen()
-    let filestatus = s:P4GetFileStatus()
-    let action = matchstr( filestatus, "action [a-zA-Z]*" )
-    let action = strpart( action, 7 )
-    echo action
-    if action == ""
-    	return "Not Open"
-    else
-    	return "Open"
-    endif
-endfunction
-
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " One of a set of functions that returns fields from the p4 fstat command
 function s:P4IsCurrent()
     let revdiff = s:P4GetHeadRev() - s:P4GetHaveRev()
-    "echo "revdiff =  " . revdiff
     if revdiff == 0
     	return 0
     else
@@ -286,17 +261,16 @@ function s:P4IsCurrent()
     endif
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " One of a set of functions that returns fields from the p4 fstat command
 function s:P4Action()
     let filestatus = s:P4GetFileStatus()
     let action = matchstr( filestatus, "action [a-zA-Z]*\\C" )
     let action = strpart( action, 7 )
-    "echo action
     return action
 endfunction
 
-"------------------------------------------------------------------------
+"----------------------------------------------------------------------------
 " Function to be called when loading vim as the p4 editor 
 " ( on "p4 submit", "p4 client" )
 function s:P4LaunchFromP4()
@@ -308,12 +282,16 @@ function s:P4LaunchFromP4()
     let ret = search( submitdescription, "w" )
     if ret != 0 " string found -- launched by p4 submit
         match Error /<enter description here>/
-        "normal c$
-	"exec "startinsert"
     else
-    	" position cursor at the top of the file 
-        "let ret = search( clientdescription, "w" )
-	"normal W
         normal 1G
+    endif
+endfunction
+
+"----------------------------------------------------------------------------
+" Function to restore last position when re-opening a file 
+" after edit or revert or sync
+function s:P4RestoreLastPosition()
+    if line("'\"") > 0 && line("'\"") <= line("$") |
+	exe "normal g`\"" |
     endif
 endfunction
