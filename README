@@ -1,0 +1,11 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=167
+
+Perforce is a source control system from http://www.perforce.com
+
+Features:
+- menu and keyboard shortcuts to open (checkout), revert, and sync files.
+- prompts to open a file for editing when you attempt to change a checked-in file.
+- perforce status displayed on the ruler.
+- tested on Windows operating systems only.
+
+This plugin provides a relatively few commonly used commands. If you are looking for the ability to carry out many perforce commands from within vim, you may wish to look at  Hari Krishna Dara's plugin (script 240)  at http://vim.sourceforge.net/scripts/script.php?script_id=240.
